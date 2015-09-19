@@ -5,12 +5,12 @@
 
 namespace Coco {
 
-class StringBuilder  
+class StringBuilder
 {
 public:
 	StringBuilder(int capacity = 32);
 	StringBuilder(const wchar_t *val);
-	
+
 	virtual ~StringBuilder();
 	void Append(const wchar_t val);
 	void Append(const wchar_t *val);
