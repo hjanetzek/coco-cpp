@@ -48,7 +48,6 @@ public:
 	int maxTerm;		// sets of size < maxTerm are enumerated
 	char CR;
 	char LF;
-	//const int EOF = -1;
 
 	int tErr;			// error codes
 	int altErr;
@@ -88,8 +87,9 @@ public:
 	void GenProductionsHeader();
 	void InitSets();
 	void OpenGen(const wchar_t* genName, bool backUp);
-	void WriteParser ();
-	void WriteStatistics ();
+	void WriteParser();
+	void WriteStatistics();
+	void WriteSymbolOrCode(FILE *gen, const Symbol *sym);
 	ParserGen (Parser *parser);
 
 };

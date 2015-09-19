@@ -49,9 +49,6 @@ class BitArray;
 class DFA
 {
 public:
-
-	const int eoF;
-
 	int maxStates;
 	int lastStateNr;	// highest state number
 	State *firstState;

@@ -30,6 +30,7 @@ Coco/R itself) does not fall under the GNU General Public License.
  compile with:
    Coco Coco.ATG -namespace Coco
 -------------------------------------------------------------------------*/
+$namespace=Coco
 
 #include "Tab.h"
 #include "DFA.h"
@@ -49,13 +50,24 @@ COMPILER Coco
 	wchar_t* tokenString;  // used in declarations of literal tokens
 	wchar_t* noString;     // used in declarations of literal tokens
 
-	void InitDeclarations() {
+	// This method will be called by the contructor if it exits.
+	// This support is specific to the C++ version of Coco/R.
+	void Init() {
+		tab = NULL;
+		dfa = NULL;
+		pgen = NULL;
 		id  = 0;
 		str = 1;
 		tokenString = NULL;
 		noString = coco_string_create(L"-none-");
 	}
 
+	// Uncomment this method if cleanup is necessary,
+	// this method will be called by the destructor if it exists.
+	// This support is specific to the C++ version of Coco/R.
+	// void Destroy() {
+		// nothing to do
+	// }
 /*-------------------------------------------------------------------------*/
 
 CHARACTERS
@@ -78,6 +90,11 @@ TOKENS
 
 PRAGMAS
 	ddtSym    = '$' { digit | letter }.  (. tab->SetDDT(la->val); .)
+	optionSym = '$' letter { letter } '='
+	            { digit | letter
+	            | '-' | '.' | ':'
+	            }.                       (. tab->SetOption(la->val); .)
+
 
 COMMENTS FROM "/*" TO "*/" NESTED
 COMMENTS FROM "//" TO lf
@@ -88,8 +105,7 @@ IGNORE cr + lf + tab
 
 PRODUCTIONS
 
-Coco                            (. Symbol *sym; Graph *g, *g1, *g2; wchar_t* gramName = NULL; CharSet *s; 
-                                   InitDeclarations(); .)
+Coco                            (. Symbol *sym; Graph *g, *g1, *g2; wchar_t* gramName = NULL; CharSet *s; .)
 =
                                 (. int beg = la->pos; int line = la->line; .)
   { // this section can be used

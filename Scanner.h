@@ -27,8 +27,8 @@ Coco/R itself) does not fall under the GNU General Public License.
 -----------------------------------------------------------------------*/
 
 
-#if !defined(COCO_SCANNER_H__)
-#define COCO_SCANNER_H__
+#if !defined(Coco_COCO_SCANNER_H__)
+#define Coco_COCO_SCANNER_H__
 
 #include <limits.h>
 #include <stdio.h>
@@ -54,13 +54,17 @@ Coco/R itself) does not fall under the GNU General Public License.
 #endif
 
 #define COCO_WCHAR_MAX 65535
-#define MIN_BUFFER_LENGTH 1024
-#define MAX_BUFFER_LENGTH (64*MIN_BUFFER_LENGTH)
-#define HEAP_BLOCK_SIZE (64*1024)
+#define COCO_MIN_BUFFER_LENGTH 1024
+#define COCO_MAX_BUFFER_LENGTH (64*COCO_MIN_BUFFER_LENGTH)
+#define COCO_HEAP_BLOCK_SIZE (64*1024)
 #define COCO_CPP_NAMESPACE_SEPARATOR L':'
+
+namespace Coco {
+
 
 // string handling, wide character
 wchar_t* coco_string_create(const wchar_t *value);
+wchar_t* coco_string_create(const wchar_t *value, int startIndex);
 wchar_t* coco_string_create(const wchar_t *value, int startIndex, int length);
 wchar_t* coco_string_create_upper(const wchar_t* data);
 wchar_t* coco_string_create_lower(const wchar_t* data);
@@ -83,14 +87,12 @@ char* coco_string_create_char(const wchar_t *value);
 void  coco_string_delete(char* &data);
 
 
-namespace Coco {
-
-
 class Token
 {
 public:
 	int kind;     // token kind
-	int pos;      // token position in the source text (starting at 0)
+	int pos;      // token position in bytes in the source text (starting at 0)
+	int charPos;  // token position in characters in the source text (starting at 0)
 	int col;      // token column (starting at 1)
 	int line;     // token line (starting at 1)
 	wchar_t* val; // token value
@@ -251,6 +253,7 @@ private:
 	int ch;           // current input character
 
 	int pos;          // byte position of current character
+	int charPos;      // position by unicode characters starting with 0
 	int line;         // line number of current character
 	int col;          // column number of current character
 	int oldEols;      // EOLs that appeared in a comment;
@@ -284,5 +287,5 @@ public:
 } // namespace
 
 
-#endif // !defined(COCO_SCANNER_H__)
+#endif
 

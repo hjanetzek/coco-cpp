@@ -64,6 +64,8 @@ public:
 	wchar_t* nsName;             // namespace for generated files
 	wchar_t* frameDir;           // directory containing the frame files
 	wchar_t* outDir;             // directory for generated files
+	bool checkEOF;               // should coco generate a check for EOF at
+	                             // the end of Parser.Parse():
 	bool emitLines;              // emit line directives in generated parser
 
 	BitArray *visited;                // mark list for graph traversals
@@ -234,6 +236,7 @@ public:
 
 	void XRef();
 	void SetDDT(const wchar_t* s);
+	void SetOption(const wchar_t* s);
 
 };
 

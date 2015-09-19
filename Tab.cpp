@@ -58,6 +58,7 @@ Tab::Tab(Parser *parser) {
 	eofSy = NewSym(Node::t, L"EOF", 0);
 	dummyNode = NewNode(Node::eps, (Symbol*)NULL, 0);
 	literals = new HashTable();
+	checkEOF = true;
 }
 
 
@@ -1181,7 +1182,7 @@ void Tab::XRef() {
 	for (i=0; i<xref->Count; i++) {
 		sym = (Symbol*)(xref->GetKey(i));
 		wchar_t *paddedName = Name(sym->name);
-		fwprintf(trace, L"  %12s", paddedName);
+		fwprintf(trace, L"  %12ls", paddedName);
 		coco_string_delete(paddedName);
 		ArrayList *list = (ArrayList*)(xref->Get(sym));
 		int col = 14;
@@ -1220,5 +1221,28 @@ void Tab::SetDDT(const wchar_t* s) {
 	}
 	coco_string_delete(st);
 }
+
+
+void Tab::SetOption(const wchar_t* s) {
+	// example: $namespace=xxx
+	//   index of '=' is 10 => nameLenght = 10
+	//   start index of xxx = 11
+
+	int nameLenght = coco_string_indexof(s, '=');
+	int valueIndex = nameLenght + 1;
+
+	wchar_t *name = coco_string_create(s, 0, nameLenght);
+	wchar_t *value = coco_string_create(s, valueIndex);
+
+	if (coco_string_equal(L"$namespace", name)) {
+		if (nsName == NULL) nsName = coco_string_create(value);
+	} else if (coco_string_equal(L"$checkEOF", name)) {
+		checkEOF = coco_string_equal(L"true", value);
+	}
+
+	delete [] name;
+	delete [] value;
+}
+
 
 }; // namespace

@@ -47,6 +47,8 @@ Coco/R itself) does not fall under the GNU General Public License.
 #include "Parser.h"
 #include "Tab.h"
 
+using namespace Coco;
+
 #ifdef _WIN32
 int wmain(int argc, wchar_t *argv[]) {
 #elif defined __GNUC__
@@ -59,7 +61,7 @@ int main(int argc, char *argv_[]) {
 #error unknown compiler!
 #endif
 
-	wprintf(L"Coco/R (Jan 11, 2010)\n");
+	wprintf(L"Coco/R (Jan 02, 2012)\n");
 
 	wchar_t *srcName = NULL, *nsName = NULL, *frameDir = NULL, *ddtString = NULL, *traceFileName = NULL;
 	wchar_t *outDir = NULL;
@@ -95,7 +97,7 @@ int main(int argc, char *argv_[]) {
 		chTrFileName = coco_string_create_char(traceFileName);
 
 		if ((parser->trace = fopen(chTrFileName, "w")) == NULL) {
-			wprintf(L"-- could not open %ls\n", chTrFileName);
+			wprintf(L"-- could not open %hs\n", chTrFileName);
 			exit(1);
 		}
 
@@ -105,7 +107,7 @@ int main(int argc, char *argv_[]) {
 
 		parser->tab->srcName  = coco_string_create(srcName);
 		parser->tab->srcDir   = coco_string_create(srcDir);
-		parser->tab->nsName   = coco_string_create(nsName);
+		parser->tab->nsName   = nsName ? coco_string_create(nsName) : NULL;
 		parser->tab->frameDir = coco_string_create(frameDir);
 		parser->tab->outDir   = coco_string_create(outDir != NULL ? outDir : srcDir);
 		parser->tab->emitLines = emitLines;
@@ -121,10 +123,11 @@ int main(int argc, char *argv_[]) {
 		fseek(parser->trace, 0, SEEK_END);
 		long fileSize = ftell(parser->trace);
 		fclose(parser->trace);
-		if (fileSize == 0)
+		if (fileSize == 0) {
 			remove(chTrFileName);
-		else
-			wprintf(L"trace output is in %ls\n", chTrFileName);
+		} else {
+			wprintf(L"trace output is in %hs\n", chTrFileName);
+		}
 
 		wprintf(L"%d errors detected\n", parser->errors->count);
 		if (parser->errors->count != 0) {

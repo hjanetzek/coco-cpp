@@ -60,7 +60,7 @@ int BitArray::getCount() {
 
 bool BitArray::Get(const int index) const
 {
-	return (Data[(index>>3)] & (1 << (index&7))) != 0;
+	return (Data[(index>>3)] & (1<<(index&7))) != 0;
 }
 
 void BitArray::Set(const int index, const bool value)
@@ -124,10 +124,22 @@ bool BitArray::Equal(const BitArray *right) const
 	if (Count != right->Count) {
 		return false;
 	}
-	for(int i = 0; i < Count; i++)
-		if ((Data[(i>>3)] & (1<<(i&7))) != (right->Data[(i>>3)] & (1<<(i&7))))
+	for(int index = 0; index < Count; index++) {
+		if (Get(index) != right->Get(index)) {
 			return false;
+		}
+	}
 	return true;
+}
+
+bool BitArray::Overlaps(const BitArray *right) const
+{
+	for (int index = 0; index < Count; ++index) {
+		if (Get(index) && right->Get(index)) {
+			return true;
+		}
+	}
+	return false;
 }
 
 const BitArray &BitArray::operator=(const BitArray &right)

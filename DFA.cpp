@@ -34,6 +34,7 @@ Coco/R itself) does not fall under the GNU General Public License.
 #include "Parser.h"
 #include "BitArray.h"
 #include "Scanner.h"
+#include "Generator.h"
 
 namespace Coco {
 
@@ -556,7 +557,7 @@ void DFA::GenComment(Comment *com, int i) {
 	fwprintf(gen, L"\n");
 	fwprintf(gen, L"bool Scanner::Comment%d() ", i);
 	fwprintf(gen, L"{\n");
-	fwprintf(gen, L"\tint level = 1, pos0 = pos, line0 = line, col0 = col;\n");
+	fwprintf(gen, L"\tint level = 1, pos0 = pos, line0 = line, col0 = col, charPos0 = charPos;\n");
 	if (coco_string_length(com->start) == 1) {
 		fwprintf(gen, L"\tNextCh();\n");
 		GenComBody(com);
@@ -571,36 +572,11 @@ void DFA::GenComment(Comment *com, int i) {
 		GenComBody(com);
 
 		fwprintf(gen, L"\t} else {\n");
-		fwprintf(gen, L"\t\tbuffer->SetPos(pos0); NextCh(); line = line0; col = col0;\n");
+		fwprintf(gen, L"\t\tbuffer->SetPos(pos0); NextCh(); line = line0; col = col0; charPos = charPos0;\n");
 		fwprintf(gen, L"\t}\n");
 		fwprintf(gen, L"\treturn false;\n");
 	}
 	fwprintf(gen, L"}\n");
-}
-
-
-void DFA::CopyFramePart(const wchar_t* stop) {
-	wchar_t startCh = stop[0];
-	int endOfStopString = coco_string_length(stop)-1;
-	wchar_t ch = 0;
-
-	fwscanf(fram, L"%lc", &ch); //	fram.ReadByte();
-	while (!feof(fram)) // ch != EOF
-		if (ch == startCh) {
-			int i = 0;
-			do {
-				if (i == endOfStopString) return; // stop[0..i] found
-				fwscanf(fram, L"%lc", &ch); i++;
-			} while (ch == stop[i]);
-			// stop[0..i-1] found; continue with last read character
-			wchar_t *subStop = coco_string_create(stop, 0, i);
-			fwprintf(gen, L"%ls", subStop);
-			coco_string_delete(subStop);
-		} else {
-			fwprintf(gen, L"%lc", ch);
-			fwscanf(fram, L"%lc", &ch);
-		}
-	errors->Exception(L" -- incomplete or corrupt scanner frame file");
 }
 
 wchar_t* DFA::SymName(Symbol *sym) { // real name value is stored in Tab.literals
@@ -638,7 +614,7 @@ void DFA::GenLiterals () {
 				fwprintf(gen, L"\tkeywords.set(L");
 				// write keyword, escape non printable characters
 				for (int k = 0; name[k] != L'\0'; k++) {
-					char c = name[k];
+					wchar_t c = name[k];
 					fwprintf(gen, (c >= 32 && c <= 127) ? L"%lc" : L"\\x%04x", c);
 				}
 				fwprintf(gen, L", %d);\n", sym->n);
@@ -663,6 +639,9 @@ int DFA::GenNamespaceOpen(const wchar_t *nsName) {
 		fwprintf(gen, L"namespace %ls {\n", curNs);
 		coco_string_delete(curNs);
 		startPos = startPos + curLen + 1;
+		if (startPos < len && nsName[startPos] == COCO_CPP_NAMESPACE_SEPARATOR) {
+			++startPos;
+		}
 		++nrOfNs;
 	} while (startPos < len);
 	return nrOfNs;
@@ -767,143 +746,94 @@ void DFA::WriteStartTab() {
 	fwprintf(gen, L"\t\tstart.set(Buffer::EoF, -1);\n");
 }
 
-void DFA::OpenGen(const wchar_t *genName, bool backUp) { /* pdt */
-	wchar_t *fn = coco_string_create_append(tab->outDir, genName); /* pdt */
-	char *chFn = coco_string_create_char(fn);
-	FILE* tmp;
-	if (backUp && ((tmp = fopen(chFn, "r")) != NULL)) {
-		fclose(tmp);
-		wchar_t *oldName = coco_string_create_append(fn, L".old");
-		char *chOldName = coco_string_create_char(oldName);
-		remove(chOldName); rename(chFn, chOldName); // copy with overwrite
-		coco_string_delete(chOldName);
-		coco_string_delete(oldName);
-	}
-	if ((gen = fopen(chFn, "w")) == NULL) {
-		errors->Exception(L"-- Cannot generate scanner file");
-	}
-	coco_string_delete(chFn);
-	coco_string_delete(fn);
-}
-
 void DFA::WriteScanner() {
-	int i;
-	wchar_t *fr = coco_string_create_append(tab->srcDir, L"Scanner.frame");  /* pdt */
-	char *chFr = coco_string_create_char(fr);
-
-	FILE* tmp;
-	if ((tmp = fopen(chFr, "r")) == NULL) {
-		if (coco_string_length(tab->frameDir) != 0) {
-			delete [] fr;
-			fr = coco_string_create(tab->frameDir);
-			coco_string_merge(fr, L"/");
-			coco_string_merge(fr, L"Scanner.frame");
-		}
-		coco_string_delete(chFr);
-		chFr = coco_string_create_char(fr);
-		if ((tmp = fopen(chFr, "r")) == NULL) {
-			errors->Exception(L"-- Cannot find Scanner.frame\n");
-		} else {
-			fclose(tmp);
-		}
-	} else {
-		fclose(tmp);
-	}
-	if ((fram = fopen(chFr, "r")) == NULL) {
-		errors->Exception(L"-- Cannot open Scanner.frame.\n");
-	}
-	coco_string_delete(chFr);
-	coco_string_delete(fr);
-
-
+	Generator g = Generator(tab, errors);
+	fram = g.OpenFrame(L"Scanner.frame");
+	gen = g.OpenGen(L"Scanner.h");
 	if (dirtyDFA) MakeDeterministic();
 
 	// Header
-	OpenGen(L"Scanner.h", true); /* pdt */
-	CopyFramePart(L"-->begin");
-	wchar_t* res = coco_string_create_lower(tab->srcName);
-	if (!coco_string_endswith(res, L"coco.atg")) {
-		fclose(gen); OpenGen(L"Scanner.h", false); /* pdt */
-	}
-	coco_string_delete(res);
+	g.GenCopyright();
+	g.SkipFramePart(L"-->begin");
 
-	CopyFramePart(L"-->namespace_open");
+	g.CopyFramePart(L"-->prefix");
+	g.GenPrefixFromNamespace();
+
+	g.CopyFramePart(L"-->prefix");
+	g.GenPrefixFromNamespace();
+
+	g.CopyFramePart(L"-->namespace_open");
 	int nrOfNs = GenNamespaceOpen(tab->nsName);
 
-	CopyFramePart(L"-->casing0");
+	g.CopyFramePart(L"-->casing0");
 	if (ignoreCase) {
 		fwprintf(gen, L"\twchar_t valCh;       // current input character (for token.val)\n");
 	}
-	CopyFramePart(L"-->commentsheader");
-	Comment *com = firstComment; i = 0;
+	g.CopyFramePart(L"-->commentsheader");
+	Comment *com = firstComment;
+	int cmdIdx = 0;
 	while (com != NULL) {
-		GenCommentHeader(com, i);
-		com = com->next; i++;
+		GenCommentHeader(com, cmdIdx);
+		com = com->next; cmdIdx++;
 	}
 
-	CopyFramePart(L"-->namespace_close");
+	g.CopyFramePart(L"-->namespace_close");
 	GenNamespaceClose(nrOfNs);
 
-	CopyFramePart(L"-->implementation");
+	g.CopyFramePart(L"-->implementation");
 	fclose(gen);
 
 	// Source
-	OpenGen(L"Scanner.cpp", true); /* pdt */
-	CopyFramePart(L"-->begin");
-
-	res = coco_string_create_lower(tab->srcName);
-	if (!coco_string_endswith(res, L"coco.atg")) {
-		fclose(gen); OpenGen(L"Scanner.cpp", false); /* pdt */
-	}
-	coco_string_delete(res);
-
-	CopyFramePart(L"-->namespace_open");
+	gen = g.OpenGen(L"Scanner.cpp");
+	g.GenCopyright();
+	g.SkipFramePart(L"-->begin");
+	g.CopyFramePart(L"-->namespace_open");
 	nrOfNs = GenNamespaceOpen(tab->nsName);
 
-	CopyFramePart(L"-->declarations");
+	g.CopyFramePart(L"-->declarations");
 	fwprintf(gen, L"\tmaxT = %d;\n", tab->terminals->Count - 1);
 	fwprintf(gen, L"\tnoSym = %d;\n", tab->noSym->n);
 	WriteStartTab();
 	GenLiterals();
 
-	CopyFramePart(L"-->initialization");
-	CopyFramePart(L"-->casing1");
+	g.CopyFramePart(L"-->initialization");
+	g.CopyFramePart(L"-->casing1");
 	if (ignoreCase) {
 		fwprintf(gen, L"\t\tvalCh = ch;\n");
 		fwprintf(gen, L"\t\tif ('A' <= ch && ch <= 'Z') ch = ch - 'A' + 'a'; // ch.ToLower()");
 	}
-	CopyFramePart(L"-->casing2");
+	g.CopyFramePart(L"-->casing2");
 	fwprintf(gen, L"\t\ttval[tlen++] = ");
 	if (ignoreCase) fwprintf(gen, L"valCh;"); else fwprintf(gen, L"ch;");
 
-	CopyFramePart(L"-->comments");
-	com = firstComment; i = 0;
+	g.CopyFramePart(L"-->comments");
+	com = firstComment; cmdIdx = 0;
 	while (com != NULL) {
-		GenComment(com, i);
-		com = com->next; i++;
+		GenComment(com, cmdIdx);
+		com = com->next; cmdIdx++;
 	}
 
-	CopyFramePart(L"-->scan1");
+	g.CopyFramePart(L"-->scan1");
 	fwprintf(gen, L"\t\t\t");
 	if (tab->ignored->Elements() > 0) { PutRange(tab->ignored); } else { fwprintf(gen, L"false"); }
 
-	CopyFramePart(L"-->scan2");
+	g.CopyFramePart(L"-->scan2");
 	if (firstComment != NULL) {
 		fwprintf(gen, L"\tif (");
-		com = firstComment; i = 0;
+		com = firstComment; cmdIdx = 0;
 		while (com != NULL) {
 			wchar_t* res = ChCond(com->start[0]);
-			fwprintf(gen, L"(%ls && Comment%d())", res, i);
+			fwprintf(gen, L"(%ls && Comment%d())", res, cmdIdx);
 			delete [] res;
 			if (com->next != NULL) {
 				fwprintf(gen, L" || ");
 			}
-			com = com->next; i++;
+			com = com->next; cmdIdx++;
 		}
 		fwprintf(gen, L") return NextToken();");
 	}
 	if (hasCtxMoves) { fwprintf(gen, L"\n"); fwprintf(gen, L"\tint apx = 0;"); } /* pdt */
-	CopyFramePart(L"-->scan3");
+	g.CopyFramePart(L"-->scan3");
 
 	/* CSB 02-10-05 check the Labels */
 	existLabel = new bool[lastStateNr+1];
@@ -912,14 +842,14 @@ void DFA::WriteScanner() {
 		WriteState(state);
 	delete [] existLabel;
 
-	CopyFramePart(L"-->namespace_close");
+	g.CopyFramePart(L"-->namespace_close");
 	GenNamespaceClose(nrOfNs);
 
-	CopyFramePart(L"$$$");
+	g.CopyFramePart(NULL);
 	fclose(gen);
 }
 
-DFA::DFA(Parser *parser) : eoF (-1) {
+DFA::DFA(Parser *parser) {
 	this->parser = parser;
 	tab = parser->tab;
 	errors = parser->errors;
